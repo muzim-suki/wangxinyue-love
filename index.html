@@ -146,7 +146,15 @@
   #screen-yes .chat::-webkit-scrollbar,#screen-no .chat::-webkit-scrollbar{width:0}
   #screen-yes .chat::before,#screen-no .chat::before{content:"";margin-top:auto}
   #screen-yes .reset,#screen-no .reset{margin:10px auto 26px}
-  #noNextWrap{padding:6px 24px 4px;text-align:center}
+  /* 结尾：再选一次（显眼） + 再看一次（低调） */
+.endbar{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 24px 30px;margin-top:auto}
+.endbar.reveal{animation:endIn .6s ease both}
+.reselect{max-width:320px;width:100%;font-size:17px;padding:16px 22px;animation:breath 2.4s ease-in-out infinite}
+.reselect:active{transform:scale(.97)}
+#screen-no .reset,#screen-yes .reset{font-size:13px;color:#a08a78;text-decoration:underline;text-underline-offset:3px;opacity:.9;margin:0;padding:6px 10px}
+@keyframes breath{0%,100%{box-shadow:0 8px 20px rgba(255,120,120,.30)}50%{box-shadow:0 16px 36px rgba(255,100,110,.55)}}
+@keyframes endIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#noNextWrap{padding:6px 24px 4px;text-align:center}
   #noNextWrap .cbtn{max-width:330px;width:100%}
   .hide{display:none!important}
 
@@ -255,13 +263,19 @@
 <div id="screen-no" class="stage hide">
   <div id="chatNo" class="chat"></div>
   <div id="noNextWrap" class="hide"><button id="btnNoNext" class="cbtn primary"></button></div>
-  <button id="btnReset" class="reset hide">再 选 一 次</button>
+  <div id="endNo" class="endbar hide">
+    <button id="btnReselect" class="cbtn primary reselect">再 选 一 次</button>
+    <button id="btnReset" class="reset">再 看 一 次</button>
+  </div>
 </div>
 
 <!-- 五：她点了「你不讨厌我」 -->
 <div id="screen-yes" class="stage hide">
   <div id="chatYes" class="chat"></div>
-  <button id="btnReset2" class="reset hide">再 选 一 次</button>
+  <div id="endYes" class="endbar hide">
+    <button id="btnReselect2" class="cbtn primary reselect">再 选 一 次</button>
+    <button id="btnReset2" class="reset">再 看 一 次</button>
+  </div>
 </div>
 
 <script>
@@ -517,6 +531,7 @@ async function playLetter(my){
   await sleep(Number($("guide").dataset.ms || 5600));
   if (my !== runId) return;
   const btn = $("btnContinue");
+  const clicked = new Promise(function(res){ btn.addEventListener("click", res, { once: true }); });
   btn.classList.remove("hide");
   const oldPaw = btn.querySelector(".paw-stamp");
   if (oldPaw) oldPaw.remove();
@@ -529,7 +544,7 @@ async function playLetter(my){
   btn.classList.add("pressed");
   await sleep(240);
   btn.classList.remove("pressed");
-  await new Promise(function(res){ btn.addEventListener("click", res, { once: true }); });
+  await clicked;
   if (my !== runId) return;
   stage.classList.add("hide");
 }
@@ -593,6 +608,9 @@ $("btnNoNext").addEventListener("click", async () => {
   for (const text of (CONFIG.no.talk2 || [])){
     if (!await sendLine(box, text, my)) return;
   }
+  if (my !== runId) return;
+  await sleep(500);
+  showEnd("endNo");
 });
 
 /* ---- 五、你不讨厌我 ---- */
@@ -615,6 +633,9 @@ $("btnYes").addEventListener("click", async () => {
     box.appendChild(m);
     await sleep(760);
   }
+  if (my !== runId) return;
+  await sleep(500);
+  showEnd("endYes");
 });
 
 /* ---- 再选一次：清干净，直接回到选择页面 ---- */
@@ -645,6 +666,7 @@ async function restart(){
   stage.classList.add("hide");
   stage.classList.remove("guide-on");
   ["screen-ask", "screen-no", "screen-yes"].forEach(function(id){ $(id).classList.add("hide"); });
+  ["endNo", "endYes"].forEach(function(id){ $(id).classList.add("hide"); $(id).classList.remove("reveal"); });
   $("noNextWrap").classList.add("hide");
   $("bgpA").classList.remove("on");
   $("bgpB").classList.add("on");
@@ -653,11 +675,57 @@ async function restart(){
   rebooting = false;
   showAsk(true);
 }
-["btnReset", "btnReset2"].forEach(function(id){
+
+/* ---- 再看一次：整页从头放 ---- */
+async function replayFromStart(){
+  if (rebooting) return;
+  rebooting = true;
+  skip = false;
+  runId++;
+  document.body.classList.remove("stage-on");
+  const old = $("chat");
+  if (old) old.remove();
+  const fresh = document.createElement("div");
+  fresh.id = "chat";
+  fresh.className = "chat";
+  fresh.innerHTML = '<div class="stamp">刚 刚</div>';
+  const stage = $("stage");
+  stage.parentNode.insertBefore(fresh, stage);
+  $("lines").innerHTML = "";
+  $("screen-ask").classList.remove("slide");
+  $("falltext").classList.remove("run");
+  $("falltext").textContent = "";
+  ["chatYes", "chatNo"].forEach(function(id){ $(id).innerHTML = ""; $(id).style.display = "none"; });
+  $("btnContinue").classList.add("hide");
+  const op = $("btnContinue").querySelector(".paw-stamp");
+  if (op) op.remove();
+  stage.classList.add("hide");
+  stage.classList.remove("guide-on");
+  ["screen-ask", "screen-no", "screen-yes"].forEach(function(id){ $(id).classList.add("hide"); });
+  ["endNo", "endYes"].forEach(function(id){ $(id).classList.add("hide"); $(id).classList.remove("reveal"); });
+  $("noNextWrap").classList.add("hide");
+  $("bgpA").classList.add("on");
+  $("bgpB").classList.remove("on");
+  window.scrollTo(0, 0);
+  await sleep(240);
+  rebooting = false;
+  runFlow();
+}
+
+/* ---- 结尾按钮只有全部看完才出现 ---- */
+function showEnd(which){
+  const bar = $(which);
+  if (!bar || !bar.classList.contains("hide")) return;
+  bar.classList.remove("hide");
+  void bar.offsetWidth;
+  bar.classList.add("reveal");
+}
+["btnReselect", "btnReselect2"].forEach(function(id){
   $(id).addEventListener("click", restart);
 });
-$("btnReset").classList.remove("hide");
-$("btnReset2").classList.remove("hide");
+["btnReset", "btnReset2"].forEach(function(id){
+  $(id).addEventListener("click", replayFromStart);
+});
 
 function setImage(imgId, src, alt){
   const img = $(imgId);
