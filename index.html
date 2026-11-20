@@ -255,13 +255,13 @@
 <div id="screen-no" class="stage hide">
   <div id="chatNo" class="chat"></div>
   <div id="noNextWrap" class="hide"><button id="btnNoNext" class="cbtn primary"></button></div>
-  <button id="btnReset" class="reset hide">再 看 一 次</button>
+  <button id="btnReset" class="reset hide">再 选 一 次</button>
 </div>
 
 <!-- 五：她点了「你不讨厌我」 -->
 <div id="screen-yes" class="stage hide">
   <div id="chatYes" class="chat"></div>
-  <button id="btnReset2" class="reset hide">再 看 一 次</button>
+  <button id="btnReset2" class="reset hide">再 选 一 次</button>
 </div>
 
 <script>
@@ -535,16 +535,22 @@ async function playLetter(my){
 }
 
 /* ---- 三、最后：问她 ---- */
-async function showAsk(){
+async function showAsk(fast){
   const ask = $("screen-ask");
   const ft = $("falltext");
   const my = runId;
   $("qtext").textContent = CONFIG.question;
-  ft.textContent = CONFIG.fall || "";
+  ft.textContent = fast ? "" : (CONFIG.fall || "");
   ft.classList.remove("run");
   ask.classList.remove("slide");
   void ft.offsetWidth;
   ask.classList.remove("hide");
+  if (fast){
+    await sleep(80);
+    if (my !== runId) return;
+    ask.classList.add("slide");
+    return;
+  }
   if (CONFIG.fall){
     ft.classList.add("run");
     await sleep(4300);            // 2.2s 掉下来 + 停 1.1s + 1.2s 化掉
@@ -611,7 +617,7 @@ $("btnYes").addEventListener("click", async () => {
   }
 });
 
-/* ---- 再看一次：整页重来 ---- */
+/* ---- 再选一次：清干净，直接回到选择页面 ---- */
 let rebooting = false;
 let runId = 0;
 async function restart(){
@@ -637,16 +643,15 @@ async function restart(){
   const op = $("btnContinue").querySelector(".paw-stamp");
   if (op) op.remove();
   stage.classList.add("hide");
+  stage.classList.remove("guide-on");
   ["screen-ask", "screen-no", "screen-yes"].forEach(function(id){ $(id).classList.add("hide"); });
   $("noNextWrap").classList.add("hide");
-  $("bgpA").classList.add("on");
-  $("bgpB").classList.remove("on");
-  stage.classList.remove("guide-on");
-  const gl = $("lines"); gl.innerHTML = "";
+  $("bgpA").classList.remove("on");
+  $("bgpB").classList.add("on");
   window.scrollTo(0, 0);
-  await sleep(260);
+  await sleep(200);
   rebooting = false;
-  runFlow();
+  showAsk(true);
 }
 ["btnReset", "btnReset2"].forEach(function(id){
   $(id).addEventListener("click", restart);
